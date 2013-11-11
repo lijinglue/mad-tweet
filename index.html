@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<!--[if lt IE 7]>
+<html class="no-js lt-ie9 lt-ie8 lt-ie7"> <![endif]-->
+<!--[if IE 7]>
+<html class="no-js lt-ie9 lt-ie8"> <![endif]-->
+<!--[if IE 8]>
+<html class="no-js lt-ie9"> <![endif]-->
+<!--[if gt IE 8]><!-->
+<html class="no-js"> <!--<![endif]-->
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title></title>
+    <meta name="description" content="">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="//netdna.bootstrapcdn.com/bootstrap/3.0.2/css/bootstrap.min.css">
+    <link rel="stylesheet" href="//netdna.bootstrapcdn.com/bootstrap/3.0.2/css/bootstrap-theme.min.css">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<!--[if lt IE 7]>
+<p class="browsehappy">You are using an <strong>outdated</strong> browser. Please <a href="http://browsehappy.com/">upgrade
+    your browser</a> to improve your experience.</p>
+<![endif]-->
+
+
+<nav class="navbar  navbar-inner" role="navigation">
+    <div class="navbar-header">
+        <a class="navbar-brand" href="#">Cluster Tech</a>
+    </div>
+</nav>
+<div id="container" class="container-fluid">
+    <div id="main">
+        <div class="row">
+        </div>
+        <div class="row">
+            <h1 class="text-center">Mad Tweet Analysis</h1>
+        </div>
+
+        <div class="row">
+            <div id="hashTagBox" class="col-md-3">
+                    <div class="row">
+                        <h2 class="text-center">HOTTEST HASHTAGS</h2>
+                    </div>
+                    <div class="row text-center">
+                        <svg class="chartHashTag"></svg>
+                    </div>
+            </div>
+            <div id="geoBox" class="col-md-6 text-center">
+                <div class="row">
+                    <h2 class="text-center">TOP ACTIVE CITIES</h2>
+                </div>
+                <div id="geo_container">
+                    <svg class="geo"></svg>
+                </div>
+            </div>
+            <div id="userBox" class="col-md-3 text-center">
+                    <div class="row">
+                        <h2>TOP MAD TWEETERS</h2>
+                    </div>
+                    <div class="row">
+                        <svg class="chartUser"></svg>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="//ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
+<script>window.jQuery || document.write('<script src="js/vendor/jquery-1.10.2.min.js"><\/script>')</script>
+<script src="js/plugins.js"></script>
+<script src="js/main.js"></script>
+<script src="//netdna.bootstrapcdn.com/bootstrap/3.0.2/js/bootstrap.min.js"></script>
+<script src="//d3js.org/d3.v3.min.js"></script>
+<script src="//d3js.org/topojson.v1.min.js"></script>
+<script src="js/d3.layout.cloud.js"></script>
+
+<script>
+//TAG cloud start
+var fill = d3.scale.category20();
+
+d3.csv("data/top_hash_tag.csv")
+        .row(function (d) {
+            return {
+                tag: d.tag,
+                tweet_count: d.tweet_count
+            };
+        })
+        .get(function (error, rows) {
+            d3.layout.cloud().size([300, 300])
+                    .words(rows.map(function (d) {
+                        return {text: d.tag, size: 10 + d.tweet_count/3 };
+                    }))
+                    .padding(5)
+                    .rotate(function () {
+                        return ~~(Math.random() * 2) * 90;
+                    })
+                    .font("Impact")
+                    .fontSize(function (d) {
+                        return d.size;
+                    })
+                    .on("end", drawCloud)
+                    .start();
+        });
+
+
+function drawCloud(words) {
+    d3.select(".chartHashTag")
+            .attr("width", 300)
+            .attr("height", 300)
+            .append("g")
+            .attr("transform", "translate(150,150)")
+            .selectAll("text")
+            .data(words)
+            .enter().append("text")
+            .style("font-size", function (d) {
+                return d.size + "px";
+            })
+            .style("font-family", "Impact")
+            .style("fill", function (d, i) {
+                return fill(i);
+            })
+            .attr("text-anchor", "middle")
+            .attr("transform", function (d) {
+                return "translate(" + [d.x, d.y] + ")rotate(" + d.rotate + ")";
+            })
+            .text(function (d) {
+                return d.text;
+            });
+}
+
+
+//Geo Section start
+var width = 800,
+        height = 480;
+
+
+var svg = d3.select('.geo')
+        .attr('width', width)
+        .attr('height', height);
+var group = svg.append('g');
+var projection = d3.geo.albersUsa();
+var scale = 0.8;
+group.attr('transform', 'scale(' + scale + ',' + scale + ')');
+
+//START DRAWING
+d3.json('data/maps/us.json', function (collection) {
+    //Draw bottom layer map
+    group.selectAll('path')
+            .data(topojson.feature(collection, collection.objects.states).features)
+            .enter().append('path')
+            .attr('d', d3.geo.path().projection(projection))
+            .attr('id', function (d) {
+                return d.properties.name
+            })
+            .style('fill', 'rgba(60,153,178,0.90)')
+            .style('stroke', 'white')
+            .style('stroke-width', 1);
+
+    //load data and draw points
+    d3.csv("data/active_city.csv")
+            .row(function (d) {
+                return {
+                    city: d.city,
+                    latitude: d.latitude,
+                    longitude: d.longitude,
+                    tweet_count: d.tweet_count
+                };
+            })
+            .get(function (error, rows) {
+
+                var tooltips = [];
+                for (var i = 0; i < rows.length; i++) {
+                    var coordinate = projection([rows[i].latitude, rows[i].longitude]);
+
+                    tooltips.push(d3.select('body')
+                            .append('div')
+                            .style('position', 'absolute')
+                            .style('z-index', '10')
+                            .style('background-color', 'rgba(137,230,255,0.5)')
+                            .style('visibility', 'hidden')
+                            .style('padding', '5px')
+                            .style('font-size', '200%')
+                            .style('border-radius', '5px')
+                            .text(rows[i].city + ':' + rows[i].tweet_count + ' tweets'));
+
+                    if (null === coordinate || undefined === coordinate) {
+                        console.log('cannot project ' + rows[i].city); //the city is not in us.
+                    } else {
+                        rows[i].coordinate = coordinate;
+                        rows[i].geometry = {
+                            type: 'Feature',
+                            geometry: {
+                                type: 'point',
+                                coordinates: [rows[i].latitude, rows[i].longitude]
+                            },
+                            properties: {
+                                name: rows[i].city,
+                                tweet_count: rows[i].tweet_count
+                            }
+                        };
+
+
+                        group.append('circle')
+                                .attr('cx', coordinate[0])
+                                .attr('cy', coordinate[1])
+                                .attr('id', i)
+                                .attr('r', rows[i].tweet_count / 5)
+                                .attr('fill-opacity', rows[i].tweet_count / 120)
+                                .style('fill', 'rgba(178,109,42,1)')
+                                .on('mouseover', function () {
+                                    return tooltips[this.id].style('visibility', 'visible');
+                                })
+                                .on('mousemove', function () {
+                                    return tooltips[this.id].style('top', (event.pageY - 10) + 'px').style('left', (event.pageX + 10) + 'px');
+                                })
+                                .on('mouseout', function () {
+                                    return tooltips[this.id].style('visibility', 'hidden');
+                                });
+                        ;
+                    }
+                }
+            });
+});
+
+//Bar Chart start
+var valueLabelWidth = 50; // space reserved for value labels (right)
+var barHeight = 20; // height of one bar
+var barLabelWidth = 0; // space reserved for bar labels
+var barLabelPadding = -10; // padding between bar and bar labels (left)
+var gridLabelHeight = 18; // space reserved for gridline labels
+var gridChartOffset = 3; // space between start of grid and first bar
+var maxBarWidth = 300; // width of the bar with the max value//
+
+d3.csv("data/active_user.csv")
+        .row(function (d) {
+            return {
+                user: d.user.length>14?d.user.substr(0,12)+'...': d.user,
+                tweet_count: d.tweet_count
+            };
+        })
+        .get(function (error, rows) {
+            var data = rows;
+            var barLabel = function (d) {
+                return d['user'];
+            };
+
+            var barValue = function (d) {
+                return parseFloat(d['tweet_count']);
+            };
+
+            var yScale = d3.scale.ordinal().domain(d3.range(0, data.length)).rangeBands([0, data.length * barHeight]);
+            var y = function (d, i) {
+                return yScale(i);
+            };
+            var yText = function (d, i) {
+                return y(d, i) + yScale.rangeBand() / 2;
+            };
+            var x = d3.scale.linear().domain([0, d3.max(data, barValue)]).range([0, maxBarWidth]);
+
+
+            var chart = d3.select('.chartUser')
+                    .attr('width', maxBarWidth + barLabelWidth + valueLabelWidth)
+                    .attr('height', gridLabelHeight + gridChartOffset + data.length * barHeight);
+
+            var barsContainer = chart.append('g')
+                    .attr('transform', 'translate(' + barLabelWidth + ',' + (gridLabelHeight + gridChartOffset) + ')');
+            barsContainer.selectAll("rect").data(data).enter().append("rect")
+                    .attr('y', y)
+                    .attr('height', yScale.rangeBand())
+                    .attr('width', function (d) {
+                        return x(barValue(d));
+                    })
+                    .attr('stroke', 'white')
+                    .attr('fill', 'steelblue');
+
+            barsContainer.selectAll("text").data(data).enter().append("text")
+                    .attr("x", function (d) {
+                        return x(barValue(d));
+                    })
+                    .attr("y", yText)
+                    .attr("dx", 3)
+                    .attr("dy", ".35em")
+                    .attr("text-anchor", "start")
+                    .attr("fill", "rgba(60,153,178,1)")
+                    .attr("stroke", "none")
+                    .text(function (d) {
+                        return d3.round(barValue(d), 2);
+                    });
+
+            var labelsContainer = chart.append('g')
+                    .attr('transform', 'translate(' + (barLabelWidth - barLabelPadding) + ',' + (gridLabelHeight + gridChartOffset) + ')');
+            labelsContainer.selectAll('text').data(data).enter().append('text')
+                    .attr('y', yText)
+                    .attr('stroke', 'none')
+                    .attr('fill', 'white')
+                    .attr("dy", ".35em") // vertical-align: middle
+                    .attr('text-anchor', 'start')
+                    .text(barLabel);
+
+        });
+
+
+</script>
+</body>
+</html>
